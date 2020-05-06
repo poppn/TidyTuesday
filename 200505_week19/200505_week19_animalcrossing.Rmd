@@ -27,10 +27,6 @@ critic <- read_tsv("https://raw.githubusercontent.com/rfordatascience/tidytuesda
 user_reviews <- read_tsv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-05-05/user_reviews.tsv") %>%
   mutate(source = "player")
 
-items <- read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-05-05/items.csv")
-
-villagers <- read_csv("https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-05-05/villagers.csv")
-
 ```
 
 ```{r plot, warning = FALSE, message = FALSE}
@@ -52,7 +48,7 @@ crit_plot <- full_join(user_reviews, critic) %>%
        y = "Grade (10 = highest)",
        fill = "Review source",
        title = "User and publication review scores for Animal Crossing: New Horizons",
-       subtitle = "") +
+       caption = "Source: @R4DScommunity, Metacritic | Chart: @poppn13") +
   theme_bw() +
   theme(panel.grid.minor = element_blank(),
         legend.position = c(0.1, 0.17),
