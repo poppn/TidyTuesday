@@ -65,39 +65,42 @@ volcano_clean <- volcano %>%
 ## join eruption and volcano datasets
 joined_volcano_eruptions <- left_join(eruptions_clean, volcano_clean) %>%
   filter(start_year >= 1600,
-         !is.na(population_within_30_km))
+         !is.na(population_within_30_km),
+         !is.na(vei))
 
+## fill in years with no data
+joined_volcano_eruptions <- joined_volcano_eruptions %>%
+  expand(start_year = 1600:2020) %>%
+  left_join(joined_volcano_eruptions)
+
+## plot
 eruptions_map <- ggplot(data = joined_volcano_eruptions) + 
   geom_sf(data = world) + 
   coord_sf(expand = FALSE) +
   theme_bw() + 
-  geom_point(aes(x = longitude, y = latitude, group = start_year, color = population_within_100_km),
-             alpha = 0.2) +
-  scale_color_viridis_c() +
-  #labs(title = "Year: {current_frame}") +
-  transition_manual(frames = start_year) +
+  geom_point(aes(x = longitude, y = latitude, group = start_year,
+                 size = population_within_30_km, color = vei),
+             shape = 17) +
+  scale_color_gradient(low = "#f5af19", high = "#f12711") +
+  transition_time(start_year) +
   enter_grow() +
-  shadow_mark() +
+  shadow_mark(alpha = 0.2) +
   labs(x = "Longitude",
        y = "Latitude",
-       color = "Population within 100 km",
+       size = "Population within 100 km",
+       color = "Volcanic explosivity index",
        title = "Cumulative volcanic eruptions from 1600 to the present",
-       subtitle = "Year: {current_frame}",
+       subtitle = "Year: {round(frame_time, 0)}",
        caption = "Source: @R4DScommunity, Nature | Chart: @poppn13")
 
+## store as animated object
 animated_eruptions <- animate(eruptions_map, fps = 10, nframes = 10 * 30,
                               start_pause = 10, end_pause = 25, width = 800, height = 500)
   
-  
-  
-  theme_bw() +
-  theme(panel.grid.minor = element_blank(),
-        legend.position = c(0.1, 0.17),
-        legend.background = element_blank())
+## save .gif
+anim_save("volcanic_eruptions.gif", animated_eruptions)
 
-## print 
-crit_plot
-
-ggsave("ACNH_critic_ratings.pdf", crit_plot)
+## print
+animated_eruptions
 
 ```
