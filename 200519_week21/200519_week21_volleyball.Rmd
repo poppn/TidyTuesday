@@ -1,0 +1,113 @@
+---
+title: "TidyTuesday 2020 - Week 21: Volleyball"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r import_libraries, warning = FALSE, message = FALSE}
+
+## tidyverse 1.3.0 for data manipulation and plotting
+if (!require(tidyverse)) install.packages('tidyverse')
+library(tidyverse)
+
+## gghalves 0.1.0 for half plots
+if (!require(gghalves)) install.packages('gghalves')
+library(gghalves)
+
+## countrycode 1.2.0 for converting country names
+if (!require(countrycode)) install.packages('countrycode')
+library(countrycode)
+
+```
+
+```{r import_data, warning = FALSE, message = FALSE}
+
+volleyball <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-05-19/vb_matches.csv', guess_max = 76000)
+
+```
+
+```{r plot, warning = FALSE, message = FALSE}
+
+players <- volleyball %>%
+  mutate(match_id = row_number()) %>%
+  ## rename for easier matching
+  rename(w_p1_name = w_player1,
+         w_p2_name = w_player2,
+         l_p1_name = l_player1,
+         l_p2_name = l_player2) %>%
+  select(match_id, matches("[wl]_p[12]"), gender) %>%
+  ## remove birthdate to allow pivot_longer to work
+  select(-contains("birthdate")) %>%
+  pivot_longer(w_p1_name:l_p2_tot_digs,
+               names_to = c("win_lose", "player", "measure"),
+               names_pattern = "([wl])_(p[12])_(.*)",
+               values_to = "value",
+               values_ptypes = list(value = "character")) %>%
+  pivot_wider(names_from = measure,
+              values_from = value) %>%
+  select(win_lose, name, gender, country, hgt) %>%
+  group_by(name, win_lose) %>%
+  mutate(count = length(name)) %>%
+  distinct() %>%
+  pivot_wider(names_from = win_lose,
+              values_from = count,
+              values_fill = list(count = 0)) %>%
+  rename(win = w,
+         lose = l) %>%
+  ## remove players with missing or more than one unique identifiers
+  group_by(name) %>%
+  mutate(n = n()) %>%
+  filter(n == 1,
+         !is.na(country)) %>%
+  ## add continents
+  mutate(ratio = win / lose,
+         country = case_when(country == "England" ~ "United Kingdom",
+                             country == "Scotland" ~ "United Kingdom",
+                             country == "Virgin Islands" ~ "U.S. Virgin Islands",
+                             TRUE ~ country)) %>%
+  group_by(country, gender) %>%
+  mutate(mean_ratio = mean(ratio))
+
+## create counts of all countries
+country_counts <- players %>%
+  ungroup() %>%
+  add_count(country, name = "num_players") %>%
+  select(country, num_players) %>%
+  distinct() %>%
+  mutate(num_players_lab = paste("n =", num_players),
+         continent = countrycode(country, "country.name", "continent"))
+
+## join
+players <- left_join(players, country_counts) %>%
+  ungroup() %>%
+  mutate(gender = if_else(gender == "M", "men's", "women's"),
+         win_loss_perc = (win) / (win + lose)) %>%
+  group_by(country) %>%
+  mutate(mean_wl_perc = mean(win_loss_perc)) %>%
+  filter(!is.na(hgt))
+
+## plot the 20 countries with the most players
+volley_plot <- ggplot(data = players,
+                      aes(x = win, y = lose)) +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "black") +
+  geom_point(aes(fill = gender), pch = 21, alpha = 0.3) +
+  scale_y_continuous(limits = c(0, 1200), breaks = seq(0, 1200, by = 400)) +
+  scale_x_continuous(limits = c(0, 1200), breaks = seq(0, 1200, by = 400)) +
+  facet_wrap(vars(country)) +
+  geom_text(data = country_counts,
+            mapping = aes(x = 0, y = 1000, label = num_players_lab),
+            hjust = 0) +
+  theme_bw() +
+  labs(x = "Wins",
+       y = "Losses",
+       title = "Career win/loss record for players in the AVP and FIVB doubles beach volleyball tournaments (2000-2019)",
+       caption = "Source: @R4DScommunity, BigTimeStats | Chart: @poppn13",
+       fill = "Gender")
+
+ggsave("beach_volleyball.png", volley_plot,
+       height = 15, width = 15)
+
+```
